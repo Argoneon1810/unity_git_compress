@@ -1,6 +1,27 @@
 import requests
+from pathlib import Path
 
-def fetch_gitignore(project_type):
+
+def fetch_gitignore(
+    project_type: str,
+    try_fetch_from_github: bool = True
+):
+    local_dir = Path("frequently_used")
+    
+    local_dir.mkdir(parents=True, exist_ok=True)
+    
+    target_filename = f"{project_type}.gitignore".lower()
+
+    try:
+        for file_path in local_dir.iterdir():
+            if file_path.is_file() and file_path.name.lower() == target_filename:
+                return file_path.read_text(encoding="utf-8")
+    except OSError:
+        pass
+
+    if not try_fetch_from_github:
+        return None
+
     api_url = "https://api.github.com/gitignore/templates"
     headers = {"Accept": "application/vnd.github.v3+json"}
     
@@ -23,21 +44,22 @@ def fetch_gitignore(project_type):
             detail_resp.raise_for_status()
             
             gitignore_content = detail_resp.json().get('source')
-            
             return gitignore_content
-                
         else:
             return None
 
-    except requests.exceptions.RequestException as e:
+    except requests.exceptions.RequestException:
         return None
+
 
 if __name__=="__main__":
     for candidate in ["python", "Unity"]:
-        if gitignore_content:=fetch_gitignore("python"):
-            print(f"✅ '{candidate}'에 해당하는 템플릿을 찾았습니다.")
+        if gitignore_content := fetch_gitignore(candidate):
+            print(f"✅ Found template for '{candidate}'.")
             print("-" * 20 + " .gitignore Content " + "-" * 20)
-            print(gitignore_content)
+            
+            preview = gitignore_content[:100] + "... (truncated)" if len(gitignore_content) > 100 else gitignore_content
+            print(preview)
             print("-" * 60)
         else:
-            print(f"❌ '{candidate}'에 해당하는 gitignore 템플릿을 찾을 수 없습니다.")
+            print(f"❌ Could not find gitignore template for '{candidate}'.")
