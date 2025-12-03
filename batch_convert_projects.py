@@ -1,19 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-관리할 프로젝트들이 들어 있는 디렉터리(Projects 디렉터리)와, 
-출력(클론)할 디렉터리(Output 디렉터리), 그리고 블랙리스트 목록을 입력받아
-각 프로젝트별로 순차적으로:
-1) 지정된 타입의 .gitignore 설정 및 Git 초기화
-2) 최종적으로 Git Clone하여 Output 디렉터리에 복제
-
-여러 프로젝트는 multiprocessing으로 병렬 처리됩니다.
-
-Usage:
-  python batch_convert_unity_projects_v2.py --projects_dir "C:/Projects" --output_dir "C:/Output" --type "Unity" --workers 4
-"""
-
 import sys
 import argparse
 from pathlib import Path
@@ -35,7 +22,18 @@ logger = utils.setup_logging(__name__)
 def parse_args() -> argparse.Namespace:
     """커맨드 라인 인자 파싱"""
     parser = argparse.ArgumentParser(
-        description="Manage multiple projects with Git initialization and .gitignore (with multiprocessing support)."
+        description="""
+관리할 프로젝트들이 들어 있는 디렉터리(Projects 디렉터리)와, 
+출력(클론)할 디렉터리(Output 디렉터리), 그리고 블랙리스트 목록을 입력받아
+각 프로젝트별로 순차적으로:
+1) 지정된 타입의 .gitignore 설정 및 Git 초기화
+2) 최종적으로 Git Clone하여 Output 디렉터리에 복제
+
+여러 프로젝트는 multiprocessing으로 병렬 처리됩니다.
+
+Usage:
+  python batch_convert_unity_projects_v2.py --projects_dir "C:/Projects" --output_dir "C:/Output" --type "Unity" --workers 4
+"""
     )
     parser.add_argument(
         "--projects_dir",

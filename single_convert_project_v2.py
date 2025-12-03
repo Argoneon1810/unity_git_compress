@@ -1,21 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-단일 프로젝트를 Git repository로 초기화하고 클론하는 스크립트
-
-입력받은 프로젝트 디렉터리에 대해:
-1) 지정된 타입의 .gitignore 설정 및 Git 초기화
-2) 최종적으로 Git Clone하여 출력 디렉터리에 복제
-
-Usage:
-  python single_convert_unity_project.py --project_path "C:/MyProject" --output_path "C:/Output" --type "Unity"
-
-※ 주의사항
-- Git이 설치되어 있어야 하며, PATH에 등록되어 있어야 합니다.
-"""
-
-# cmd /v:on /c "set PROJ_NAME=VRMirror&& python -m single_convert_unity_project --project_path "D:\1. Projects\1. Unity\!PROJ_NAME!" --output_path "E:\Unity\projects\!PROJ_NAME!" --type "Unity""
+# Modified Usage:
+# python -m single_convert_unity_project --input_root "D:\1. Projects\1. Unity" --output_root "E:\Unity\projects" --project_name "VRMirror" --type "Unity"
 
 import sys
 import argparse
@@ -36,17 +23,34 @@ logger = utils.setup_logging(__name__)
 def parse_args() -> argparse.Namespace:
     """커맨드 라인 인자 파싱"""
     parser = argparse.ArgumentParser(
-        description="Convert a single project with Git initialization and .gitignore, then clone it."
+        description="""
+단일 프로젝트를 Git repository로 초기화하고 클론하는 스크립트
+
+입력받은 부모 디렉터리와 프로젝트 이름을 결합하여:
+1) 지정된 타입의 .gitignore 설정 및 Git 초기화
+2) 최종적으로 Git Clone하여 출력 부모 디렉터리 내 동일한 이름으로 복제
+
+Usage:
+  python single_convert_unity_project.py --input_root "C:/MyProjects" --output_root "C:/Output" --project_name "MyGame" --type "Unity"
+
+※ 주의사항
+- Git이 설치되어 있어야 하며, PATH에 등록되어 있어야 합니다.
+"""
     )
     parser.add_argument(
-        "--project_path",
+        "--input_root",
         required=True,
-        help="Path to the project directory to be converted"
+        help="Parent directory containing the project folder"
     )
     parser.add_argument(
-        "--output_path",
+        "--output_root",
         required=True,
-        help="Path where the cloned project will be saved"
+        help="Parent directory where the project folder will be cloned"
+    )
+    parser.add_argument(
+        "--project_name",
+        required=True,
+        help="Name of the project folder (used for both source and destination)"
     )
     parser.add_argument(
         "--force",
@@ -69,8 +73,14 @@ def main():
     """메인 실행 함수"""
     args = parse_args()
     
-    project_path = Path(args.project_path)
-    output_path = Path(args.output_path)
+    # 경로 재구성: Root + ProjectName
+    project_name = args.project_name
+    input_root = Path(args.input_root)
+    output_root = Path(args.output_root)
+    
+    project_path = input_root / project_name
+    output_path = output_root / project_name
+    
     force = args.force
     project_type = args.type
     
@@ -80,11 +90,16 @@ def main():
     
     if not project_path.is_dir():
         logger.error(f"Project directory does not exist: {project_path}")
+        logger.error(f"(Checked inside input root: {input_root})")
         sys.exit(1)
     
     logger.info("=" * 70)
-    logger.info(f"Project Path:  {project_path}")
-    logger.info(f"Output Path:   {output_path}")
+    logger.info(f"Project Name:  {project_name}")
+    logger.info(f"Input Root:    {input_root}")
+    logger.info(f"Output Root:   {output_root}")
+    logger.info("-" * 70)
+    logger.info(f"Target Source: {project_path}")
+    logger.info(f"Target Dest:   {output_path}")
     logger.info(f"Project Type:  {project_type}")
     logger.info(f"Force Mode:    {'ON' if force else 'OFF'}")
     logger.info("=" * 70)
