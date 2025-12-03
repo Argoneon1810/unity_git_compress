@@ -402,3 +402,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# cmd /v:on /c "set PROJ_NAME=NugetPlayground2&& python -m single_convert_unity_project --project_path "D:\1. Projects\1. Unity\!PROJ_NAME!" --output_path "E:\Unity\projects\!PROJ_NAME!""
