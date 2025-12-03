@@ -2,16 +2,16 @@
 # -*- coding: utf-8 -*-
 
 """
-관리할 유니티 프로젝트들이 들어 있는 디렉터리(Projects 디렉터리)와, 
+관리할 프로젝트들이 들어 있는 디렉터리(Projects 디렉터리)와, 
 출력(클론)할 디렉터리(Output 디렉터리), 그리고 블랙리스트 목록을 입력받아
 각 프로젝트별로 순차적으로:
-1) .gitignore 설정 및 Git 초기화
+1) 지정된 타입의 .gitignore 설정 및 Git 초기화
 2) 최종적으로 Git Clone하여 Output 디렉터리에 복제
 
 여러 프로젝트는 multiprocessing으로 병렬 처리됩니다.
 
 Usage:
-  python batch_convert_unity_projects_v2.py --projects_dir "C:/UnityProjects" --output_dir "C:/Output" --blacklist "ProjectA,ProjectB" --workers 4
+  python batch_convert_unity_projects_v2.py --projects_dir "C:/Projects" --output_dir "C:/Output" --type "Unity" --workers 4
 """
 
 import sys
@@ -19,7 +19,8 @@ import argparse
 from pathlib import Path
 from typing import List, Tuple
 from multiprocessing import Pool, cpu_count
-import unity_git_utils as utils
+import utils_git as utils
+import gitignore_fetcher
 
 # ============================================================================
 # 로깅 설정
@@ -34,12 +35,12 @@ logger = utils.setup_logging(__name__)
 def parse_args() -> argparse.Namespace:
     """커맨드 라인 인자 파싱"""
     parser = argparse.ArgumentParser(
-        description="Manage multiple Unity projects with Git initialization and .gitignore (with multiprocessing support)."
+        description="Manage multiple projects with Git initialization and .gitignore (with multiprocessing support)."
     )
     parser.add_argument(
         "--projects_dir",
         required=True,
-        help="Input directory where all the unity projects reside"
+        help="Input directory where all the projects reside"
     )
     parser.add_argument(
         "--output_dir",
@@ -57,6 +58,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=f"Number of worker processes (default: CPU count)"
     )
+    parser.add_argument(
+        "--type",
+        type=str,
+        default="Unity",
+        help="Project type to fetch appropriate .gitignore (default: Unity)"
+    )
     return parser.parse_args()
 
 # ============================================================================
@@ -69,19 +76,19 @@ def is_in_blacklist(project_name: str, blacklist_list: List[str]) -> bool:
     """
     return any(project_name == item.strip() for item in blacklist_list)
 
-def process_single_project(args: Tuple[Path, Path, List[str]]) -> Tuple[str, bool]:
+def process_single_project(args: Tuple[Path, Path, List[str], str]) -> Tuple[str, bool]:
     """
     단일 프로젝트 처리 함수 (multiprocessing용)
     
     Git 초기화 및 커밋 → 클론을 연속으로 수행
     
     Args:
-        args: (프로젝트_경로, 출력_디렉터리, 블랙리스트)
+        args: (프로젝트_경로, 출력_디렉터리, 블랙리스트, gitignore_content)
         
     Returns:
         (프로젝트_이름, 성공_여부)
     """
-    project_path, output_dir, blacklist_list = args
+    project_path, output_dir, blacklist_list, gitignore_content = args
     project_name = project_path.name
     
     # 블랙리스트 확인
@@ -91,7 +98,7 @@ def process_single_project(args: Tuple[Path, Path, List[str]]) -> Tuple[str, boo
     
     # Step 1: Git 초기화 및 .gitignore 설정
     # verbose_logger를 넘기지 않아 내부 로그를 끄고 결과 메시지만 받음
-    success, msg = utils.init_and_commit_project(project_path)
+    success, msg = utils.init_and_commit_project(project_path, gitignore_content=gitignore_content)
     
     # Batch 로직에 맞게 메시지 포맷팅 (기존 코드와의 호환성)
     if success:
@@ -133,6 +140,7 @@ def main():
     output_dir = Path(args.output_dir)
     blacklist_str = args.blacklist.strip()
     workers = args.workers or cpu_count()
+    project_type = args.type
     
     # 블랙리스트 파싱
     blacklist_list = [x for x in blacklist_str.split(",") if x.strip()] if blacklist_str else []
@@ -150,8 +158,23 @@ def main():
     
     logger.info(f"Projects Directory: {projects_dir}")
     logger.info(f"Output Directory: {output_dir}")
+    logger.info(f"Project Type: {project_type}")
     logger.info(f"Blacklist: {blacklist_list if blacklist_list else 'None'}")
     logger.info(f"Workers: {workers}")
+    logger.info("=" * 70)
+
+    # ========================================================================
+    # .gitignore 준비
+    # ========================================================================
+    
+    logger.info(f"Fetching .gitignore for type: '{project_type}'...")
+    gitignore_content = gitignore_fetcher.fetch_gitignore(project_type)
+    
+    if not gitignore_content:
+        logger.error(f"Failed to fetch .gitignore for type '{project_type}'. Aborting.")
+        sys.exit(1)
+    
+    logger.info(f"Successfully loaded .gitignore for '{project_type}'")
     logger.info("=" * 70)
     
     # ========================================================================
@@ -174,9 +197,9 @@ def main():
     # Multiprocessing으로 병렬 처리
     # ========================================================================
     
-    # 각 프로젝트마다 (프로젝트_경로, 출력_디렉터리, 블랙리스트) 튜플 생성
+    # 각 프로젝트마다 (프로젝트_경로, 출력_디렉터리, 블랙리스트, gitignore_content) 튜플 생성
     process_args = [
-        (project_path, output_dir, blacklist_list)
+        (project_path, output_dir, blacklist_list, gitignore_content)
         for project_path in projects_to_process
     ]
     
